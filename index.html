@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Converter RTLH KoboToolbox → e-Mahan</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f0f4f8; min-height: 100vh; color: #1a202c; }
+
+  .header {
+    background: linear-gradient(135deg, #1a3c6e 0%, #2563a8 100%);
+    color: white;
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .header-icon {
+    width: 48px; height: 48px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .header p { font-size: 13px; opacity: 0.85; }
+
+  .container { max-width: 820px; margin: 32px auto; padding: 0 20px; }
+
+  .card {
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+  .card-title {
+    font-size: 15px; font-weight: 700; color: #1a3c6e;
+    margin-bottom: 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .step-badge {
+    width: 24px; height: 24px;
+    background: #1a3c6e; color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+
+  .drop-zone {
+    border: 2px dashed #a0aec0;
+    border-radius: 10px;
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #f7fafc;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: #2563a8;
+    background: #ebf4ff;
+  }
+  .drop-zone.has-file {
+    border-color: #38a169;
+    background: #f0fff4;
+  }
+  .drop-icon { font-size: 36px; margin-bottom: 10px; }
+  .drop-text { font-size: 14px; color: #4a5568; }
+  .drop-sub { font-size: 12px; color: #718096; margin-top: 6px; }
+  #fileInput { display: none; }
+
+  .file-info {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: #f0fff4;
+    border: 1px solid #9ae6b4;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 14px;
+  }
+  .file-info.visible { display: flex; }
+  .file-name { font-size: 13px; font-weight: 600; color: #276749; }
+  .file-rows { font-size: 12px; color: #48bb78; }
+
+  .filter-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 560px) { .filter-grid { grid-template-columns: 1fr; } }
+
+  .field label {
+    display: block;
+    font-size: 12px; font-weight: 600; color: #4a5568;
+    margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .field select, .field input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #2d3748;
+    background: white;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field select:focus, .field input:focus { border-color: #2563a8; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .stat-box {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-num { font-size: 28px; font-weight: 700; color: #1a3c6e; }
+  .stat-label { font-size: 12px; color: #718096; margin-top: 4px; }
+
+  .preview-table-wrap { overflow-x: auto; max-height: 280px; overflow-y: auto; border-radius: 8px; border: 1px solid #e2e8f0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    background: #1a3c6e; color: white;
+    padding: 8px 10px; text-align: left;
+    position: sticky; top: 0; z-index: 1;
+    white-space: nowrap;
+  }
+  td { padding: 7px 10px; border-bottom: 1px solid #f0f4f8; color: #2d3748; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f7fafc; }
+
+  .btn-convert {
+    width: 100%;
+    padding: 14px;
+    background: #1a3c6e;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .btn-convert:hover { background: #2563a8; }
+  .btn-convert:active { transform: scale(0.99); }
+  .btn-convert:disabled { background: #a0aec0; cursor: not-allowed; }
+
+  .btn-download {
+    width: 100%;
+    padding: 14px;
+    background: #276749;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-top: 12px;
+  }
+  .btn-download:hover { background: #38a169; }
+
+  .progress-bar {
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 99px;
+    overflow: hidden;
+    margin: 12px 0;
+  }
+  .progress-fill {
+    height: 100%;
+    background: #2563a8;
+    width: 0%;
+    transition: width 0.3s;
+    border-radius: 99px;
+  }
+
+  .log-box {
+    background: #1a202c;
+    color: #68d391;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 12px;
+    font-family: monospace;
+    max-height: 160px;
+    overflow-y: auto;
+    margin-top: 14px;
+    display: none;
+  }
+  .log-box.visible { display: block; }
+  .log-line { margin-bottom: 4px; }
+  .log-line.err { color: #fc8181; }
+  .log-line.info { color: #90cdf4; }
+
+  .result-card {
+    display: none;
+    background: #f0fff4;
+    border: 1px solid #9ae6b4;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+  .result-card.visible { display: block; }
+  .result-icon { font-size: 40px; margin-bottom: 10px; }
+  .result-title { font-size: 16px; font-weight: 700; color: #276749; margin-bottom: 6px; }
+  .result-sub { font-size: 13px; color: #48bb78; }
+
+  .mapping-info {
+    background: #ebf8ff;
+    border: 1px solid #90cdf4;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: #2c5282;
+    margin-bottom: 16px;
+  }
+  .mapping-info strong { font-weight: 700; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-blue { background: #ebf8ff; color: #2563a8; border: 1px solid #90cdf4; }
+  .badge-green { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">🏠</div>
+  <div>
+    <h1>Converter RTLH — KoboToolbox → e-Mahan</h1>
+    <p>Konversi data pendataan rumah tidak layak huni ke format template e-Mahan Lampung</p>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- STEP 1: Upload -->
+  <div class="card">
+    <div class="card-title">
+      <div class="step-badge">1</div>
+      Upload File Export KoboToolbox
+    </div>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="drop-icon">📂</div>
+      <div class="drop-text">Klik atau seret file ke sini</div>
+      <div class="drop-sub">Format yang didukung: .xlsx, .xls (export KoboToolbox Form RTLH)</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+    <div class="file-info" id="fileInfo">
+      <span style="font-size:20px;">✅</span>
+      <div>
+        <div class="file-name" id="fileName">—</div>
+        <div class="file-rows" id="fileRows">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Filter & Preview -->
+  <div class="card" id="step2" style="display:none;">
+    <div class="card-title">
+      <div class="step-badge">2</div>
+      Filter & Preview Data
+    </div>
+
+    <div class="mapping-info">
+      <strong>Pemetaan kolom terdeteksi:</strong>
+      KoboToolbox → Template e-Mahan · <span class="badge badge-blue">42 kolom</span> akan dihasilkan
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-num" id="statTotal">0</div>
+        <div class="stat-label">Total Data</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statFiltered">0</div>
+        <div class="stat-label">Setelah Filter</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statDesa">0</div>
+        <div class="stat-label">Desa/Kel</div>
+      </div>
+    </div>
+
+    <div class="filter-grid">
+      <div class="field">
+        <label>Filter Kabupaten/Kota</label>
+        <select id="filterKabupaten" onchange="applyFilters()">
+          <option value="">— Semua —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Filter Kecamatan</label>
+        <select id="filterKecamatan" onchange="applyFilters()">
+          <option value="">— Semua —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Filter Desa/Kelurahan</label>
+        <select id="filterDesa" onchange="applyFilters()">
+          <option value="">— Semua —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Cari Nama KRT</label>
+        <input type="text" id="filterNama" placeholder="Ketik nama..." oninput="applyFilters()">
+      </div>
+    </div>
+
+    <div class="preview-table-wrap">
+      <table id="previewTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Kode Wilayah</th>
+            <th>No Urut</th>
+            <th>Nama KRT</th>
+            <th>NIK</th>
+            <th>Kab/Kota</th>
+            <th>Kecamatan</th>
+            <th>Desa/Kel</th>
+            <th>Pendata</th>
+          </tr>
+        </thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- STEP 3: Convert -->
+  <div class="card" id="step3" style="display:none;">
+    <div class="card-title">
+      <div class="step-badge">3</div>
+      Konversi & Download
+    </div>
+
+    <button class="btn-convert" id="btnConvert" onclick="convertData()">
+      ⚡ Konversi ke Format e-Mahan
+    </button>
+
+    <div class="progress-bar" id="progressBar" style="display:none;">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+    <div class="log-box" id="logBox"></div>
+
+    <div class="result-card" id="resultCard">
+      <div class="result-icon">🎉</div>
+      <div class="result-title" id="resultTitle">Konversi berhasil!</div>
+      <div class="result-sub" id="resultSub"></div>
+      <button class="btn-download" id="btnDownload" onclick="downloadFile()">
+        ⬇️ Download File e-Mahan (.xlsx)
+      </button>
+      <div id="manualDownload" style="display:none; margin-top:10px; text-align:center;">
+        <a id="manualLink" href="#" style="font-size:13px; color:#276749; text-decoration:underline;">
+          → Klik link ini jika tombol tidak bekerja
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let rawData = [];
+let filteredData = [];
+let outputWorkbook = null;
+
+const TEMPLATE_HEADERS = [
+  'KODE WILAYAH DES/KEL (13 Karakter)',
+  'NOMOR URUT',
+  'NAMA LENGKAP KEPALA RUMAH TANGGA - Teks',
+  'NO NIK - Angka 16 Digit',
+  'ALAMAT RUMAH (Nama Jalan; No.Rumah; RT; RW; Dusun; dll; Teks',
+  'NO HP',
+  'JENIS KELAMIN - Pilihan',
+  'PEKERJAAN - Pilihan',
+  'PENGHASILAN PERBULAN - Pilihan',
+  'STATUS KEPEMILIKAN RUMAH - Pilihan',
+  'ASET RUMAH DI TEMPAT LAIN - Pilihan',
+  'STATUS KEPEMILIKAN TANAH - Pilihan',
+  'JENIS KAWASAN - Pilihan',
+  null, null, null,
+  'MATERIAL FONDASI - Pilihan',
+  'MATERIAL KOLOM- Pilihan',
+  'MATERIAL RANGKA ATAP - Pilihan',
+  'MATERIAL PLAFON - Pilihan',
+  'MATERIAL BALOK - Pilihan',
+  'SLOOF - Pilihan',
+  'JENDELA - Pilihan',
+  'VENTILASI - Pilihan',
+  'KONDISI LANTAI - Pilihan',
+  'MATERIAL LANTAI - Pilihan',
+  'KONDISI DINDING - Pilihan',
+  'MATERIAL DINDING - Pilihan',
+  'KONDISI ATAP - Pilihan',
+  'MATERIAL ATAP - Pilihan',
+  'LUAS RUMAH (M²) - Angka',
+  'JUMLAH PENGHUNI - Angka',
+  'SUMBER AIR MINUM - Pilihan',
+  'JARAK SAM - TPA TINJA - Pilihan',
+  'KM DAN JAMBAN - Pilihan',
+  'JENIS KLOSET - Pilihan',
+  'JENIS TPA TINJA - Pilihan',
+  'NAMA FILE FOTO - Teks',
+  'LONGITUDE - Angka desimal',
+  'LATITUDE - Angka desimal',
+  'TANGGAL PENDATAAN - Tanggal',
+  'NAMA PENDATA - Teks'
+];
+
+const KOBO_TO_TEMPLATE = [
+  'Kode Wilayah (13 Karakter)',
+  'Nomor Urut',
+  'Nama Lengkap Kepala Rumah Tangga',
+  'Nomor NIK',
+  'Alamat Rumah',
+  'Nomor HP',
+  'Jenis Kelamin',
+  'Pekerjaan',
+  'Penghasilan Per Bulan',
+  'Status Kepemilikan Rumah',
+  'Aset Rumah di Tempat Lain',
+  'Status Kepemilikan Tanah',
+  'Jenis Kawasan',
+  null, null, null,
+  'Material Fondasi',
+  'Material Kolom',
+  'Material Rangka Atap',
+  'Material Plafon',
+  'Material Balok',
+  'Sloof',
+  'Jendela',
+  'Ventilasi',
+  'Kondisi Lantai',
+  'Material Lantai',
+  'Kondisi Dinding',
+  'Material Dinding',
+  'Kondisi Atap',
+  'Material Atap',
+  'Luas Rumah (M²)',
+  'Jumlah Penghuni',
+  'Sumber Air Minum',
+  'Jarak SAM - TPA Tinja',
+  'KM dan Jamban',
+  'Jenis Kloset',
+  'Jenis TPA Tinja',
+  'Nama File Foto',
+  '_Lokasi GPS (Longitude & Latitude)_longitude',
+  '_Lokasi GPS (Longitude & Latitude)_latitude',
+  'Tanggal Pendataan',
+  'Nama Pendata'
+];
+
+// Drag & Drop
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) processFile(e.target.files[0]);
+});
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    rawData = json;
+
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileRows').textContent = `${json.length} baris data ditemukan`;
+    document.getElementById('fileInfo').classList.add('visible');
+    dropZone.classList.add('has-file');
+    dropZone.innerHTML = '<div class="drop-icon">✅</div><div class="drop-text">File berhasil dimuat</div><div class="drop-sub">Klik untuk ganti file</div>';
+
+    populateFilters();
+    applyFilters();
+    document.getElementById('step2').style.display = 'block';
+    document.getElementById('step3').style.display = 'block';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function populateFilters() {
+  const kabs = [...new Set(rawData.map(r => r['Kabupaten / Kota'] || '').filter(Boolean))].sort();
+  const kecs = [...new Set(rawData.map(r => r['Kecamatan'] || '').filter(Boolean))].sort();
+  const desas = [...new Set(rawData.map(r => r['Desa / Kelurahan'] || '').filter(Boolean))].sort();
+
+  fillSelect('filterKabupaten', kabs);
+  fillSelect('filterKecamatan', kecs);
+  fillSelect('filterDesa', desas);
+}
+
+function fillSelect(id, opts) {
+  const el = document.getElementById(id);
+  const cur = el.value;
+  el.innerHTML = '<option value="">— Semua —</option>';
+  opts.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o; opt.textContent = o;
+    if (o === cur) opt.selected = true;
+    el.appendChild(opt);
+  });
+}
+
+function applyFilters() {
+  const kab = document.getElementById('filterKabupaten').value;
+  const kec = document.getElementById('filterKecamatan').value;
+  const desa = document.getElementById('filterDesa').value;
+  const nama = document.getElementById('filterNama').value.toLowerCase();
+
+  filteredData = rawData.filter(r => {
+    if (kab && (r['Kabupaten / Kota'] || '') !== kab) return false;
+    if (kec && (r['Kecamatan'] || '') !== kec) return false;
+    if (desa && (r['Desa / Kelurahan'] || '') !== desa) return false;
+    if (nama && !(r['Nama Lengkap Kepala Rumah Tangga'] || '').toLowerCase().includes(nama)) return false;
+    return true;
+  });
+
+  document.getElementById('statTotal').textContent = rawData.length;
+  document.getElementById('statFiltered').textContent = filteredData.length;
+  const uniqDesa = new Set(filteredData.map(r => r['Kode Wilayah (13 Karakter)'])).size;
+  document.getElementById('statDesa').textContent = uniqDesa;
+
+  renderPreview();
+}
+
+function renderPreview() {
+  const tbody = document.getElementById('previewBody');
+  tbody.innerHTML = '';
+  const slice = filteredData.slice(0, 50);
+  slice.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${row['Kode Wilayah (13 Karakter)'] || ''}</td>
+      <td>${row['Nomor Urut'] || ''}</td>
+      <td>${row['Nama Lengkap Kepala Rumah Tangga'] || ''}</td>
+      <td>${row['Nomor NIK'] || ''}</td>
+      <td>${row['Kabupaten / Kota'] || ''}</td>
+      <td>${row['Kecamatan'] || ''}</td>
+      <td>${row['Desa / Kelurahan'] || ''}</td>
+      <td>${row['Nama Pendata'] || ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  if (filteredData.length > 50) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="9" style="text-align:center;color:#718096;font-style:italic;">...dan ${filteredData.length - 50} baris lainnya</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function log(msg, type='') {
+  const box = document.getElementById('logBox');
+  box.classList.add('visible');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + type;
+  line.textContent = '› ' + msg;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function setProgress(pct) {
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+function formatDate(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    return val.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+  return val;
+}
+
+function convertData() {
+  if (!filteredData.length) { alert('Tidak ada data untuk dikonversi!'); return; }
+
+  document.getElementById('logBox').innerHTML = '';
+  document.getElementById('resultCard').classList.remove('visible');
+  document.getElementById('progressBar').style.display = 'block';
+  document.getElementById('btnConvert').disabled = true;
+  setProgress(5);
+
+  log(`Memulai konversi ${filteredData.length} baris data...`, 'info');
+
+  setTimeout(() => {
+    try {
+      const wb = XLSX.utils.book_new();
+      const wsData = [];
+
+      // Row 1: Headers
+      wsData.push(TEMPLATE_HEADERS.map(h => h || ''));
+
+
+      setProgress(20);
+      log(`Header template dibuat (42 kolom)`);
+
+      let converted = 0, errors = 0;
+
+      filteredData.forEach((row, idx) => {
+        try {
+          const outRow = KOBO_TO_TEMPLATE.map((koboCol, i) => {
+            if (koboCol === null) return '';
+            const val = row[koboCol];
+            if (koboCol === 'Tanggal Pendataan') return formatDate(val);
+            if (koboCol === 'Nomor NIK') return val ? String(val) : '';
+            if (koboCol === 'Kode Wilayah (13 Karakter)') return val ? String(val) : '';
+            return val !== undefined && val !== null ? val : '';
+          });
+          wsData.push(outRow);
+          converted++;
+        } catch(e) {
+          errors++;
+          log(`Baris ${idx+1} error: ${e.message}`, 'err');
+        }
+
+        if (idx % 50 === 0) setProgress(20 + Math.round((idx / filteredData.length) * 65));
+      });
+
+      setProgress(90);
+      log(`${converted} baris berhasil dikonversi`, 'info');
+      if (errors > 0) log(`${errors} baris gagal`, 'err');
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      // Column widths
+      ws['!cols'] = [
+        {wch:18},{wch:10},{wch:30},{wch:18},{wch:40},{wch:14},{wch:12},{wch:18},
+        {wch:18},{wch:18},{wch:18},{wch:18},{wch:14},{wch:5},{wch:5},{wch:5},
+        {wch:16},{wch:16},{wch:16},{wch:14},{wch:14},{wch:12},{wch:10},{wch:10},
+        {wch:14},{wch:14},{wch:14},{wch:14},{wch:12},{wch:14},{wch:10},{wch:10},
+        {wch:16},{wch:16},{wch:14},{wch:14},{wch:14},{wch:30},{wch:14},{wch:14},
+        {wch:18},{wch:20}
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      outputWorkbook = wb;
+
+      setProgress(100);
+      log(`File siap diunduh!`, 'info');
+
+      document.getElementById('resultTitle').textContent = `Konversi berhasil! ${converted} data siap diunduh`;
+      document.getElementById('resultSub').textContent = `Format template e-Mahan · 42 kolom · ${filteredData.length} baris data`;
+      document.getElementById('resultCard').classList.add('visible');
+
+    } catch(e) {
+      log('ERROR: ' + e.message, 'err');
+    }
+
+    document.getElementById('btnConvert').disabled = false;
+  }, 100);
+}
+
+function downloadFile() {
+  if (!outputWorkbook) return;
+  const ts = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const kec = document.getElementById('filterKecamatan').value.replace(/\s+/g,'_') || 'ALL';
+  const filename = `emahan_RTLH_${kec}_${ts}.xlsx`;
+
+  // Generate base64 for manual link fallback
+  const wbBase64 = XLSX.write(outputWorkbook, { bookType: 'xlsx', type: 'base64' });
+  const dataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbBase64;
+
+  // Show manual link always
+  const ml = document.getElementById('manualLink');
+  ml.href = dataUri;
+  ml.download = filename;
+  document.getElementById('manualDownload').style.display = 'block';
+
+  // Also try auto-download via blob
+  try {
+    const wbArr = XLSX.write(outputWorkbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbArr], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch(e) {
+    // fallback: user uses manual link above
+  }
+}
+</script>
+</body>
+</html>
